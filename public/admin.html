@@ -1,0 +1,178 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Admin Dashboard - OLMS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: linear-gradient(135deg, #f9d1d1, #d7e9f7, #f1f0c0); font-family: Arial, sans-serif; padding-top: 70px; }
+    .card { border-radius:12px; box-shadow:0 8px 30px rgba(208, 253, 250, 0.15); }
+    .search { max-width:420px; }
+  </style>
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">Admin Dashboard</a>
+      <div class="d-flex ms-auto">
+        <span class="navbar-text me-3" id="adminInfo"></span>
+        <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <div class="card p-4 mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <input id="searchInput" class="form-control search" placeholder="Search by Name or Employee ID">
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-bordered">
+          <thead class="table-primary">
+            <tr>
+              <th>Employee ID</th>
+              <th>Name</th>
+              <th>Reason</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="leaveBody">
+            <tr><td colspan="7" class="text-center">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Role-based access
+  const role = localStorage.getItem('role');
+  if(role !== 'admin') {
+    alert('Access denied. Admins only.');
+    window.location.href = '/login.html';
+  }
+
+  // Show admin info
+  document.getElementById('adminInfo').textContent = 
+    "Welcome, " + localStorage.getItem('name') + " (" + (localStorage.getItem('employeeId') || 'ID N/A') + ")";
+
+  const token = localStorage.getItem('token');
+  const leaveBody = document.getElementById('leaveBody');
+  const searchInput = document.getElementById('searchInput');
+  let allLeaves = [];
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = '/login.html';
+  }
+
+  // Fetch all leaves
+  async function fetchLeaves(){
+    try {
+      const res = await fetch('/api/leaves', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if(res.status === 401) { alert('Unauthorized'); logout(); return; }
+      const data = await res.json();
+      allLeaves = Array.isArray(data) ? data : [];
+
+      // Sort latest first (descending by fromDate)
+      allLeaves.sort((a,b) => new Date(b.fromDate) - new Date(a.fromDate));
+
+      renderTable(allLeaves);
+    } catch(err) {
+      console.error(err);
+      leaveBody.innerHTML = '<tr><td colspan="7" class="text-center">Error loading leaves</td></tr>';
+    }
+  }
+
+  // Format date
+  function formatDate(d){
+    if(!d) return '';
+    return new Date(d).toLocaleDateString();
+  }
+
+  // Render table
+  function renderTable(leaves){
+    leaveBody.innerHTML = '';
+    if(!leaves.length){
+      leaveBody.innerHTML = '<tr><td colspan="7" class="text-center">No leaves</td></tr>';
+      return;
+    }
+
+    leaves.forEach(l => {
+      const isFlagged = l.flagged; // flagged leave
+
+      const actionButtons = isFlagged
+        ? `<button class="btn btn-sm btn-danger" onclick="deleteLeave('${l._id}')">Delete</button>` // only delete
+        : `<button class="btn btn-sm btn-success me-1" onclick="updateStatus('${l._id}','approved')">Approve</button>
+           <button class="btn btn-sm btn-danger" onclick="updateStatus('${l._id}','rejected')">Reject</button>`;
+
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${l.employeeId || ''}</td>
+        <td>${l.name || ''}</td>
+        <td>${l.reason || ''}</td>
+        <td>${formatDate(l.fromDate)}</td>
+        <td>${formatDate(l.toDate)}</td>
+        <td>${isFlagged ? '⚠️ Flagged' : l.status}</td>
+        <td>${actionButtons}</td>
+      `;
+      leaveBody.appendChild(row);
+    });
+  }
+
+  // Update status (approve/reject)
+  async function updateStatus(id, status){
+    try{
+      const res = await fetch(`/api/leaves/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ status })
+      });
+      const j = await res.json();
+      if(j.success) fetchLeaves();
+      else alert(j.message || 'Could not update status');
+    } catch(err) {
+      console.error(err);
+      alert('Error updating status');
+    }
+  }
+
+  // Delete leave
+  async function deleteLeave(id){
+    if(!confirm('Are you sure you want to delete this leave?')) return;
+    try{
+      const res = await fetch(`/api/leaves/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      const j = await res.json();
+      if(j.success) fetchLeaves();
+      else alert(j.message || 'Could not delete leave');
+    } catch(err){
+      console.error(err);
+      alert('Error deleting leave');
+    }
+  }
+
+  // Search functionality
+  searchInput.addEventListener('input', (e) => {
+    const term = e.target.value.trim().toLowerCase();
+    if(!term) return renderTable(allLeaves);
+    const filtered = allLeaves.filter(l =>
+      (l.name || '').toLowerCase().includes(term) ||
+      (l.employeeId || '').toLowerCase().includes(term)
+    );
+    renderTable(filtered);
+  });
+
+  fetchLeaves();
+</script>
+</body>
+</html>
