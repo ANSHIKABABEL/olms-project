@@ -1,7 +1,7 @@
 organization=anshikababel
-projectKey=anshikababel
+projectKey=anshikababel_olms-project
 serverUrl=https://sonarcloud.io
-serverVersion=8.0.0.76411
-dashboardUrl=https://sonarcloud.io/dashboard?id=anshikababel
-ceTaskId=AZpx2FyO5fLyjg9CumLn
-ceTaskUrl=https://sonarcloud.io/api/ce/task?id=AZpx2FyO5fLyjg9CumLn
+serverVersion=8.0.0.76449
+dashboardUrl=https://sonarcloud.io/dashboard?id=anshikababel_olms-project
+ceTaskId=AZp0LLNfzRbLk5yx97-U
+ceTaskUrl=https://sonarcloud.io/api/ce/task?id=AZp0LLNfzRbLk5yx97-U
